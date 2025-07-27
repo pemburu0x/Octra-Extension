@@ -40,6 +40,65 @@ npm run dev
 
 ```
 
+## 🔌 Chrome Extension
+
+Octra Web Wallet is also available as a Chrome Extension for seamless dApp integration.
+
+### Building the Extension
+
+```bash
+# Build extension for production
+npm run build:extension
+
+# Development with auto-rebuild
+npm run watch:extension
+```
+
+### Installing the Extension
+
+1. Build the extension using the command above
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode" in the top right
+4. Click "Load unpacked" and select the `extension-build` folder
+5. The Octra Wallet extension will appear in your browser toolbar
+
+### Extension Features
+
+- 🔐 **Secure Popup Interface** - Quick access to wallet functions
+- 🌐 **dApp Integration** - Seamless connection with decentralized applications
+- 🔔 **Smart Notifications** - Real-time alerts for transactions and connections
+- ⚡ **Auto-refresh** - Automatic balance updates every 5 minutes
+- 🎯 **One-click Actions** - Send, receive, and view history from popup
+- 🔒 **Enhanced Security** - Password protection with encrypted storage
+- 📱 **Responsive Design** - Optimized for all screen sizes
+
+### dApp Integration API
+
+Developers can integrate with Octra Wallet using the injected API:
+
+```javascript
+// Check if wallet is installed
+if (window.octraWallet) {
+  // Connect to wallet
+  const connection = await window.octraWallet.connect({
+    appName: 'My dApp',
+    permissions: ['view_address', 'view_balance', 'call_methods']
+  });
+  
+  // Send transaction
+  const result = await window.octraWallet.sendTransaction({
+    to: 'oct1234567890abcdef...',
+    amount: '1.5',
+    message: 'Payment for services'
+  });
+  
+  // Listen for events
+  window.octraWallet.on('connected', (event) => {
+    console.log('Wallet connected:', event.detail);
+  });
+}
+```
+
 ## 🚀 Production Deployment (VPS)
 
 ### Prerequisites
