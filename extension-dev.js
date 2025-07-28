@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const chokidar = require('chokidar');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import chokidar from 'chokidar';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class ExtensionDevServer {
   constructor() {
@@ -83,7 +87,7 @@ class ExtensionDevServer {
       execSync('npm run build', { stdio: 'pipe' });
       
       // Run extension builder
-      const ExtensionBuilder = require('./build-extension.js');
+      const { default: ExtensionBuilder } = await import('./build-extension.js');
       const builder = new ExtensionBuilder();
       await builder.build();
       
@@ -125,9 +129,9 @@ class ExtensionDevServer {
 }
 
 // Run the dev server
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const devServer = new ExtensionDevServer();
   devServer.start();
 }
 
-module.exports = ExtensionDevServer;
+export default ExtensionDevServer;
