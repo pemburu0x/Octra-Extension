@@ -54,14 +54,19 @@ class ExtensionBuilder {
 
     } catch (error) {
       console.error('❌ Build failed:', error.message);
+      console.error('Stack trace:', error.stack);
       process.exit(1);
     }
   }
 
   buildMainApp() {
     try {
-      // Build with production environment
-      execSync('npm run build:prod', { stdio: 'inherit' });
+      // Check if build:prod script exists, otherwise use build
+      const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+      const buildScript = packageJson.scripts['build:prod'] ? 'build:prod' : 'build';
+      
+      console.log(`Running: npm run ${buildScript}`);
+      execSync(`npm run ${buildScript}`, { stdio: 'inherit' });
     } catch (error) {
       throw new Error('Failed to build main application');
     }
@@ -96,13 +101,19 @@ class ExtensionBuilder {
 
     extensionFiles.forEach(file => {
       if (fs.existsSync(file)) {
+        console.log(`Copying ${file}...`);
         fs.copyFileSync(file, path.join(this.buildDir, file));
+      } else {
+        console.warn(`Warning: ${file} not found, skipping...`);
       }
     });
 
     // Copy icons
     if (fs.existsSync('icons')) {
+      console.log('Copying icons directory...');
       this.copyDirectory('icons', path.join(this.buildDir, 'icons'));
+    } else {
+      console.warn('Warning: icons directory not found, skipping...');
     }
   }
 
@@ -111,12 +122,18 @@ class ExtensionBuilder {
       throw new Error('Built application not found. Run npm run build first.');
     }
 
+    console.log(`Copying ${this.distDir} to ${this.buildDir}...`);
     // Copy the entire dist directory contents to extension build
     this.copyDirectory(this.distDir, this.buildDir);
   }
 
   updateManifest() {
     const manifestPath = path.join(this.buildDir, 'manifest.json');
+    
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error('manifest.json not found in build directory');
+    }
+    
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
     // Update version from package.json
@@ -135,15 +152,19 @@ class ExtensionBuilder {
       "https://ons-api.xme.my.id/*"
     ];
 
+    console.log(`Updated manifest version to ${manifest.version}`);
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
   }
 
   createPackage() {
     try {
       // Create zip package
+      console.log('Creating zip package...');
       execSync(`cd ${this.buildDir} && zip -r ../${this.buildDir}.zip .`, { stdio: 'inherit' });
+      console.log('✅ Zip package created successfully');
     } catch (error) {
       console.warn('⚠️  Could not create zip package. You can manually zip the extension-build folder.');
+      console.warn('Error details:', error.message);
     }
   }
 
@@ -161,6 +182,10 @@ class ExtensionBuilder {
       if (entry.isDirectory()) {
         this.copyDirectory(srcPath, destPath);
       } else {
+        // Skip copying certain files that shouldn't be in extension
+        if (entry.name.endsWith('.map') || entry.name === '.DS_Store') {
+          continue;
+        }
         fs.copyFileSync(srcPath, destPath);
       }
     }
@@ -170,7 +195,10 @@ class ExtensionBuilder {
 // Run the builder
 if (import.meta.url === `file://${process.argv[1]}`) {
   const builder = new ExtensionBuilder();
-  builder.build();
+  builder.build().catch(error => {
+    console.error('❌ Unhandled error:', error);
+    process.exit(1);
+  });
 }
 
 export default ExtensionBuilder;
