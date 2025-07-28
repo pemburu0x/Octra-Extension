@@ -14,7 +14,7 @@ body {
 }
 
 .popup-container {
-  width: 380px;
+  width: 420px;
   min-height: 500px;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   position: relative;

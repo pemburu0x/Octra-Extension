@@ -377,14 +377,111 @@ class BackgroundManager {
   }
 
   async makeAPIRequest(endpoint, rpcProvider, options = {}) {
-    const url = `${rpcProvider.url}${endpoint}`;
+    // Clean up endpoint to ensure proper formatting
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${rpcProvider.url}${cleanEndpoint}`;
+    
     const headers = {
       'Content-Type': 'application/json',
       ...rpcProvider.headers,
       ...options.headers
     };
 
-    return fetch(url, {
+    try {
+      console.log(`Extension making API request to: ${url}`);
+      
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: AbortSignal.timeout(30000)
+      });
+      
+      if (!response.ok) {
+        console.error(`API request failed: ${response.status} ${response.statusText}`);
+        // Try to get error details
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('Error details:', errorText);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`Network error for ${url}:`, error);
+      // Return a failed response object instead of throwing
+      return new Response(JSON.stringify({ 
+        error: 'Network error', 
+        details: error.message 
+      }), {
+        status: 500,
+        statusText: 'Network Error',
+        headers: new Headers({ 'Content-Type': 'application/json' })
+      });
+    }
+  }
+
+  async handleFetchBalance(request, sendResponse) {
+    try {
+      const { address, privateKey } = request;
+      
+      // Get active RPC provider
+      const rpcProvider = await this.getActiveRPCProvider();
+      console.log('Using RPC provider for balance:', rpcProvider.name, rpcProvider.url);
+      
+      // Fetch balance from API
+      const balanceResponse = await this.makeAPIRequest(
+        `/balance/${address}`,
+        rpcProvider
+      );
+
+      let balance = 0;
+      let nonce = 0;
+
+      if (balanceResponse.ok) {
+        try {
+          const balanceData = await balanceResponse.json();
+          balance = parseFloat(balanceData.balance || '0');
+          nonce = balanceData.nonce || 0;
+        } catch (parseError) {
+          console.error('Failed to parse balance response:', parseError);
+          // For new addresses, this is normal
+        }
+      } else {
+        console.warn('Balance fetch failed, treating as new address');
+        // For 404 or other errors, treat as new address with zero balance
+      }
+
+      // Fetch encrypted balance
+      let encryptedBalance = null;
+      try {
+        const encResponse = await this.makeAPIRequest(
+          `/view_encrypted_balance/${address}`,
+          rpcProvider,
+          {
+            headers: { 'X-Private-Key': privateKey }
+          }
+        );
+
+        if (encResponse.ok) {
+          const encData = await encResponse.json();
+          encryptedBalance = {
+            public: parseFloat(encData.public_balance?.split(' ')[0] || '0'),
+            encrypted: parseFloat(encData.encrypted_balance?.split(' ')[0] || '0'),
+            total: parseFloat(encData.total_balance?.split(' ')[0] || '0')
+          };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch encrypted balance:', error);
+      }
+
+      sendResponse({
+        success: true,
+        balance,
+        nonce,
+        encryptedBalance
+      });
+
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      sendResponse({
       ...options,
       headers,
       signal: AbortSignal.timeout(30000)
@@ -400,9 +497,11 @@ class BackgroundManager {
         type: 'basic',
         iconUrl: 'icons/icon48.png',
         title,
-        message,
-        ...data
+        error: error.message,
+        balance: 0,
+        nonce: 0
       });
+    }
     } catch (error) {
       console.error('Error showing notification:', error);
     }

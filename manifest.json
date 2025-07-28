@@ -15,7 +15,8 @@
     "https://octra.network/*",
     "https://octrascan.io/*",
     "https://ons-api.xme.my.id/*",
-    "http://localhost:*/*"
+    "http://localhost:*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
